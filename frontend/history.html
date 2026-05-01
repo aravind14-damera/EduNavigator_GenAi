@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search History - EduNavigator AI</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="scrollable-body">
+    <nav>
+        <div class="brand-container">
+            <img src="../logo.png" alt="SRM AP Logo" class="logo-img">
+            <div class="brand-text">EDUNAVIGATOR <span>AI</span></div>
+        </div>
+        <div class="nav-links">
+            <a href="dashboard.html"><i class="fas fa-search"></i> New Search</a>
+            <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        <div class="dashboard-header" style="margin-bottom: 2rem;">
+            <h2 style="color: var(--primary);">Your Academic Search History</h2>
+            <p>Review your previous interactions and AI-generated notes.</p>
+        </div>
+
+        <div id="historyList" style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div style="text-align: center; padding: 5rem;">
+                <i class="fas fa-circle-notch fa-spin fa-3x" style="color: var(--primary);"></i>
+                <p style="margin-top: 1rem;">Retrieving history from Cloud...</p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2026 SRM University AP. Intelligent Learning Systems.</p>
+    </footer>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = 'index.html';
+
+        async function loadHistory() {
+            try {
+                const res = await fetch(`${API_URL}/history`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const logs = await res.json();
+                
+                const list = document.getElementById('historyList');
+                if (logs.length === 0) {
+                    list.innerHTML = `
+                        <div class="glass" style="padding: 3rem; text-align: center; border-radius: 20px;">
+                            <i class="fas fa-history fa-4x" style="opacity: 0.1; margin-bottom: 1rem;"></i>
+                            <p>No search history found. Start exploring!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                list.innerHTML = logs.map(log => `
+                    <div class="answer-card">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                            <h4 style="color: var(--primary); font-size: 1.1rem;">
+                                <i class="fas fa-question-circle"></i> ${log.question}
+                            </h4>
+                            <span style="font-size: 0.8rem; color: var(--text-light); background: #eee; padding: 4px 10px; border-radius: 10px;">
+                                ${new Date(log.timestamp).toLocaleString()}
+                            </span>
+                        </div>
+                        <p style="white-space: pre-wrap; line-height: 1.6; font-size: 0.95rem;">${log.answer}</p>
+                    </div>
+                `).join('');
+            } catch (err) {
+                document.getElementById('historyList').innerHTML = '<p style="text-align:center; color:red;">Failed to load history.</p>';
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+
+        loadHistory();
+    </script>
+</body>
+</html>

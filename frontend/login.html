@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - EduNavigator AI</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="no-scroll">
+    <!-- FIXED: Restored login-bg class -->
+    <div class="bg-image login-bg"></div>
+    
+    <nav>
+        <div class="brand-container">
+            <a href="index.html" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                <img src="../assets/logo.png" alt="SRM AP Logo" class="logo-img">
+                <div class="brand-text">EDUNAVIGATOR <span>AI</span></div>
+            </a>
+        </div>
+    </nav>
+
+    <div class="auth-wrapper">
+        <!-- FIXED: Glass effect restored -->
+        <div class="auth-container glass">
+            <h2>Portal Login</h2>
+            <p style="margin-bottom: 2rem; opacity: 0.7;">Access the Academic Smart Assistant</p>
+            
+            <div class="input-group">
+                <label>Registration Number / Email</label>
+                <input type="text" id="regNumber" placeholder="e.g. AP21110010001">
+            </div>
+            
+            <div class="input-group">
+                <label>Password</label>
+                <div style="position: relative;">
+                    <input type="password" id="password" placeholder="••••••••">
+                    <i class="fas fa-eye" id="toggleIcon" onclick="togglePassword()" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666;"></i>
+                </div>
+            </div>
+            
+            <button class="btn" id="loginBtn" onclick="login()">Sign In to Portal <i class="fas fa-arrow-right"></i></button>
+            
+            <p style="margin-top: 2rem; font-size: 0.95rem;">
+                Don't have an account? <a href="register.html" style="color: var(--primary); font-weight: 800; text-decoration: none;">Register here</a>
+            </p>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2026 SRM University AP. EduNavigator AI Academic Assistant.</p>
+    </footer>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        function togglePassword() {
+            const pass = document.getElementById('password');
+            const icon = document.getElementById('toggleIcon');
+            pass.type = pass.type === 'password' ? 'text' : 'password';
+            icon.className = pass.type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+        }
+        async function login() {
+            const email = document.getElementById('regNumber').value;
+            const password = document.getElementById('password').value;
+            if (!email || !password) { alert('Please fill all fields'); return; }
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    localStorage.setItem('token', data.access_token);
+                    localStorage.setItem('email', email);
+                    localStorage.setItem('role', data.role);
+                    window.location.href = data.role === 'admin' ? 'admin.html' : 'dashboard.html';
+                } else { alert(data.detail || 'Login failed'); }
+            } catch (err) { alert('Backend Connection Error. Make sure your server is running!'); }
+        }
+    </script>
+</body>
+</html>

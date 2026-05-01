@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduNavigator AI - SRM University AP</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .hero { height: 90vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 0 10%; color: white; position: relative; }
+        .hero h1 { font-size: 4rem; font-weight: 800; margin-bottom: 1.5rem; text-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        .hero h1 span { color: var(--secondary); }
+        .hero p { font-size: 1.4rem; max-width: 850px; margin-bottom: 3.5rem; line-height: 1.6; opacity: 0.95; }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2.5rem; padding: 6rem 10%; background: #fff; position: relative; }
+        .feature-card { padding: 3rem; border-radius: 24px; text-align: center; box-shadow: 0 15px 40px rgba(0,0,0,0.04); transition: 0.4s; border: 1px solid var(--border); background: #fff; }
+        .feature-card:hover { transform: translateY(-10px); border-color: var(--secondary); box-shadow: 0 20px 45px rgba(0,0,0,0.08); }
+        .feature-card i { font-size: 3.5rem; color: var(--primary); margin-bottom: 1.5rem; }
+        .cta-group { display: flex; gap: 2rem; }
+        .cta-btn { padding: 1.2rem 2.8rem; font-size: 1.1rem; border-radius: 15px; font-weight: 800; text-decoration: none; transition: 0.3s; display: flex; align-items: center; gap: 12px; text-transform: uppercase; }
+        .btn-gold { background: var(--secondary); color: var(--primary); }
+        .btn-outline { background: rgba(255, 255, 255, 0.1); color: white; border: 2px solid white; backdrop-filter: blur(8px); }
+        .navbar-login { border: 2.5px solid var(--secondary); padding: 0.8rem 2rem; border-radius: 12px; transition: 0.4s; font-weight: 800; color: white !important; display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .navbar-login:hover { background: var(--secondary); color: var(--primary) !important; box-shadow: 0 8px 25px rgba(251, 176, 59, 0.5); transform: translateY(-3px); }
+    </style>
+</head>
+<body class="scrollable-body">
+    <div class="bg-image home-bg"></div>
+    <nav>
+        <div class="brand-container">
+            <img src="../assets/logo.png" alt="SRM AP Logo" class="logo-img">
+            <div class="brand-text">EDUNAVIGATOR <span>AI</span></div>
+        </div>
+        <div class="nav-links">
+            <a href="login.html" class="navbar-login">LOGIN <i class="fas fa-sign-in-alt"></i></a>
+        </div>
+    </nav>
+    <section class="hero">
+        <h1>Navigate the Future of <span>Academic Intelligence</span></h1>
+        <p>The next-generation SRMAP academic assistant. Ingest research papers, query course materials, and unlock intelligent insights with the power of GenAI.</p>
+        <div class="cta-group">
+            <a href="login.html" class="cta-btn btn-gold">Get Started <i class="fas fa-rocket"></i></a>
+            <a href="register.html" class="cta-btn btn-outline">Join the Network</a>
+        </div>
+    </section>
+    <section class="features">
+        <div class="feature-card"><i class="fas fa-brain"></i><h3>Neural Search</h3><p>Go beyond keywords. Our AI understands context for smarter results.</p></div>
+        <div class="feature-card"><i class="fas fa-cloud-upload-alt"></i><h3>Research Ingestion</h3><p>Faculty can upload PDFs into the Cloud AI brain for instant analysis.</p></div>
+        <div class="feature-card"><i class="fas fa-history"></i><h3>Secure History</h3><p>Every interaction is logged securely, building your personal study library.</p></div>
+    </section>
+    <footer style="background: var(--primary); padding: 4rem 10%; border: none;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; text-align: left;">
+            <div><h3 style="color: var(--secondary); margin-bottom: 1rem;">EduNavigator AI</h3><p style="color: rgba(255,255,255,0.7);">Providing intelligent solutions for SRM University AP.</p></div>
+            <div style="text-align: right; color: rgba(255,255,255,0.9);"><p>© 2026 SRM University AP. Intelligent Learning Systems.</p></div>
+        </div>
+    </footer>
+</body>
+</html>

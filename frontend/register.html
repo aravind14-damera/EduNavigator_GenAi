@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - EduNavigator AI</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="no-scroll">
+    <div class="bg-image register-bg"></div>
+    
+    <nav>
+        <div class="brand-container">
+            <a href="index.html" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                <img src="../assets/logo.png" alt="SRM AP Logo" class="logo-img">
+                <div class="brand-text">EDUNAVIGATOR <span>AI</span></div>
+            </a>
+        </div>
+    </nav>
+
+    <div class="auth-wrapper">
+        <div class="auth-container glass">
+            <h2>Create Account</h2>
+            <p style="margin-bottom: 2rem; opacity: 0.7;">Join the SRMAP Academic Network</p>
+            
+            <div class="input-group">
+                <label>Registration Number / Email</label>
+                <input type="text" id="email" placeholder="AP21110010001">
+            </div>
+            
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="••••••••">
+            </div>
+
+            <div class="input-group">
+                <label>Portal Role</label>
+                <select id="role" style="width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border); outline: none;">
+                    <option value="student">Student Portal</option>
+                    <option value="admin">Faculty / Admin Portal</option>
+                </select>
+            </div>
+            
+            <button class="btn" onclick="register()">Create Account <i class="fas fa-user-plus"></i></button>
+            
+            <p style="margin-top: 2rem; font-size: 0.95rem;">
+                Already have an account? <a href="login.html" style="color: var(--primary); font-weight: 800; text-decoration: none;">Login here</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        async function register() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const role = document.getElementById('role').value;
+            if (!email || !password) { alert('Please fill all fields'); return; }
+
+            const res = await fetch(`${API_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, role })
+            });
+
+            if (res.ok) {
+                alert('Registration successful! Please login.');
+                window.location.href = 'login.html';
+            } else {
+                const data = await res.json();
+                alert(data.detail || 'Registration failed');
+            }
+        }
+    </script>
+</body>
+</html>

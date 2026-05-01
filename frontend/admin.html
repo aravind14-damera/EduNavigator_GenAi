@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Admin - EduNavigator AI</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #f4f7f9; }
+        nav { z-index: 1000; position: relative; }
+        .main-layout { display: flex; flex: 1; overflow: hidden; position: relative; }
+        
+        .chat-sidebar { width: 300px; background: var(--primary); color: white; display: flex; flex-direction: column; transition: 0.3s ease; z-index: 900; }
+        .chat-sidebar.hidden { margin-left: -300px; }
+        
+        .new-chat-btn { margin: 20px; padding: 12px; background: var(--secondary); color: var(--primary); border: none; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: 0.3s; }
+        .new-chat-btn:hover { transform: scale(1.05); }
+        
+        .chat-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .chat-item { padding: 12px; border-radius: 8px; cursor: pointer; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; transition: 0.3s; background: rgba(255,255,255,0.05); }
+        .chat-item:hover, .chat-item.active { background: rgba(255,255,255,0.15); color: var(--secondary); }
+        
+        .chat-main { flex: 1; display: flex; flex-direction: column; position: relative; background: #f8f9fa; }
+        .view-section { display: none; height: 100%; overflow-y: auto; padding: 2rem; width: 100%; }
+        .view-section.active { display: flex; flex-direction: column; }
+        
+        .chat-messages { flex: 1; overflow-y: auto; padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
+        .msg { max-width: 85%; padding: 1.2rem; border-radius: 15px; line-height: 1.6; }
+        .msg.user { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
+        .msg.ai { align-self: flex-start; background: white; color: var(--text-main); border-bottom-left-radius: 2px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        
+        .chat-input-container { padding: 1.5rem 5%; background: white; border-top: 1px solid var(--border); display: flex; gap: 15px; align-items: center; }
+        .input-wrapper { flex: 1; background: #f1f3f5; border-radius: 12px; display: flex; align-items: center; padding: 0 15px; }
+        .input-wrapper input { background: transparent; border: none; padding: 12px; outline: none; flex: 1; }
+        
+        .doc-card { background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        
+        .sidebar-nav { padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px; }
+        .sidebar-nav a { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: rgba(255,255,255,0.8); text-decoration: none; font-weight: 500; transition: 0.3s; cursor: pointer; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { background: rgba(255,255,255,0.1); color: var(--secondary); border-left: 4px solid var(--secondary); }
+        .sidebar-nav i { width: 20px; text-align: center; }
+        
+        #sidebarChatSection { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+        #sidebarChatSection.active { display: flex; }
+        
+        .hamburger-icon { font-size: 1.5rem; color: white; cursor: pointer; padding: 10px; transition: 0.3s; margin-right: 15px; }
+        .hamburger-icon:hover { color: var(--secondary); }
+        
+        .search-bar { width: 100%; padding: 10px 15px; border: none; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.15); color: white; outline: none; }
+        .search-bar::placeholder { color: rgba(255,255,255,0.6); }
+        
+        .export-bar { display: flex; gap: 10px; padding: 10px 2rem; background: #fff; border-bottom: 1px solid var(--border); justify-content: flex-end; }
+        .export-btn { background: #f1f3f5; color: var(--text-main); border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; transition: 0.2s; }
+        .export-btn:hover { background: var(--primary); color: white; }
+    </style>
+    <!-- Export Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+    <nav class="navy-nav">
+        <div class="brand-container" style="display:flex; align-items:center;">
+            <i class="fas fa-bars hamburger-icon" onclick="toggleSidebar()"></i>
+            <img src="../assets/logo.png" alt="SRM AP Logo" class="logo-img">
+            <div class="brand-text">FACULTY PORTAL <span id="navHeading" style="color:var(--secondary); margin-left: 10px;">- AI Chat</span></div>
+        </div>
+    </nav>
+
+    <div class="main-layout">
+        <div class="chat-sidebar" id="chatSidebar">
+            <div class="sidebar-nav">
+                <a onclick="showView('chat')" id="nav-chat" class="active"><i class="fas fa-comment"></i> AI Chat</a>
+                <a onclick="showView('upload')" id="nav-upload"><i class="fas fa-upload"></i> Global Upload</a>
+                <a onclick="showView('manage')" id="nav-manage"><i class="fas fa-tasks"></i> Manage Library</a>
+                <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
+            
+            <div id="sidebarChatSection" class="active">
+                <button class="new-chat-btn" onclick="createNewChat()"><i class="fas fa-plus"></i> NEW CHAT</button>
+                <input type="text" class="search-bar" id="chatSearchInput" placeholder="Search chats..." onkeyup="filterChats()">
+                <div class="chat-list" id="chatList"></div>
+            </div>
+        </div>
+
+        <div class="chat-main">
+            <!-- CHAT VIEW -->
+            <div id="chatView" class="view-section active" style="padding:0;">
+                <div class="export-bar">
+                    <button class="export-btn" onclick="exportPDF()"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                    <button class="export-btn" onclick="exportDOCX()"><i class="fas fa-file-word"></i> Export DOCX</button>
+                    <button class="export-btn" onclick="copyChatLink()"><i class="fas fa-link"></i> Copy Link</button>
+                </div>
+                <div class="chat-messages" id="chatMessages" style="flex:1; overflow-y:auto; padding:2rem;">
+                    <div class="msg ai">Faculty Session Started. You can manage global library or start an AI discussion here.</div>
+                </div>
+                <div class="chat-input-container">
+                    <div class="input-wrapper">
+                        <input type="text" id="chatInput" placeholder="Ask anything to the AI brain...">
+                    </div>
+                    <button class="btn" id="sendBtn" onclick="sendMessage()" style="width:auto; margin-top:0; padding: 0.8rem 1.5rem;"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+
+            <!-- UPLOAD VIEW -->
+            <div id="uploadView" class="view-section">
+                <div style="max-width: 600px; margin: 4rem auto; background: white; padding: 3rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+                    <h2 style="color:var(--primary); margin-bottom: 2rem;">Upload Global Resource</h2>
+                    <div class="input-group">
+                        <label>Subject / Course Name</label>
+                        <input type="text" id="subject" placeholder="e.g. Data Science">
+                    </div>
+                    <div class="input-group">
+                        <label>Select File (PDF/DOCX/TXT)</label>
+                        <input type="file" id="globalFile">
+                    </div>
+                    <button class="btn" onclick="uploadGlobal()">Publish to Global Library <i class="fas fa-cloud-upload-alt"></i></button>
+                </div>
+            </div>
+
+            <!-- MANAGE VIEW -->
+            <div id="manageView" class="view-section">
+                <div style="max-width: 900px; margin: 2rem auto;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem;">
+                        <h2 style="color:var(--primary);">Academic Document Library</h2>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn" onclick="loadDocuments()" style="width:auto; margin-top:0; padding:10px; background:#f1f3f5; color:var(--text-main);"><i class="fas fa-sync-alt"></i></button>
+                            <input type="text" id="libSearchInput" placeholder="Search library..." onkeyup="filterLibrary()" style="padding:10px 15px; border-radius:8px; border:1px solid #ccc; width:250px;">
+                        </div>
+                    </div>
+                    <div id="documentList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        const token = localStorage.getItem('token');
+        let currentChatId = null;
+
+        if (!token) window.location.href = 'login.html';
+
+        let chatsData = [];
+        let docsData = [];
+
+        function toggleSidebar() {
+            document.getElementById('chatSidebar').classList.toggle('hidden');
+        }
+
+        function showView(viewName) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+            
+            document.getElementById(viewName + 'View').classList.add('active');
+            
+            const navLink = document.getElementById('nav-' + viewName);
+            if (navLink) navLink.classList.add('active');
+
+            const navHeading = document.getElementById('navHeading');
+            const chatSection = document.getElementById('sidebarChatSection');
+            
+            if (viewName === 'chat') { 
+                navHeading.textContent = '- AI Chat';
+                chatSection.classList.add('active');
+                if(currentChatId) openChat(currentChatId); 
+            } else {
+                chatSection.classList.remove('active');
+            }
+
+            if (viewName === 'upload') { 
+                navHeading.textContent = '- Global Upload';
+            }
+            if (viewName === 'manage') {
+                navHeading.textContent = '- Global Library';
+                loadDocuments();
+            }
+        }
+
+        async function loadChats() {
+            const res = await fetch(`${API_URL}/chats`, { headers: { 'Authorization': `Bearer ${token}` } });
+            chatsData = await res.json();
+            renderChats(chatsData);
+        }
+
+        function renderChats(chatsToRender) {
+            document.getElementById('chatList').innerHTML = chatsToRender.map(c => `
+                <div class="chat-item ${c._id === currentChatId ? 'active' : ''}" onclick="openChat('${c._id}')">
+                    <span class="chat-item-title">${c.title}</span>
+                    <div class="chat-actions">
+                        <i class="fas fa-pencil-alt" onclick="event.stopPropagation(); renameChat('${c._id}')"></i>
+                        <i class="fas fa-trash" onclick="event.stopPropagation(); deleteChat('${c._id}')"></i>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterChats() {
+            const query = document.getElementById('chatSearchInput').value.toLowerCase();
+            const filtered = chatsData.filter(chat => chat.title.toLowerCase().includes(query));
+            renderChats(filtered);
+        }
+
+        async function createNewChat() {
+            const res = await fetch(`${API_URL}/chats`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ title: "Faculty Session" })
+            });
+            const data = await res.json();
+            currentChatId = data.chat_id;
+            loadChats();
+            document.getElementById('chatMessages').innerHTML = '<div class="msg ai">New Faculty Session started.</div>';
+            showView('chat');
+        }
+
+        async function openChat(id) {
+            currentChatId = id;
+            loadChats();
+            const res = await fetch(`${API_URL}/chat/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const chat = await res.json();
+            document.getElementById('chatMessages').innerHTML = chat.messages.map(m => `<div class="msg ${m.role === 'user' ? 'user' : 'ai'}">${m.content}</div>`).join('');
+            document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const msg = input.value;
+            if (!msg) return;
+            if (!currentChatId) await createNewChat();
+            
+            const container = document.getElementById('chatMessages');
+            container.innerHTML += `<div class="msg user">${msg}</div>`;
+            input.value = '';
+            
+            // Add thinking indicator
+            const aiMsgDiv = document.createElement('div');
+            aiMsgDiv.className = 'msg ai';
+            aiMsgDiv.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Grok is thinking...';
+            container.appendChild(aiMsgDiv);
+            container.scrollTop = container.scrollHeight;
+
+            const formData = new FormData();
+            formData.append('message', msg);
+            
+            try {
+                // Get Answer from our RAG backend
+                const res = await fetch(`${API_URL}/chat/${currentChatId}/message`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await res.json();
+                
+                // Display the AI response
+                aiMsgDiv.innerHTML = '';
+                let fullAnswer = data.answer || "No response from AI.";
+                let sources = data.sources || [];
+                
+                // Map of filename to ID for linkification
+                const fileToId = {};
+                sources.forEach(s => {
+                    if (s.filename && s.document_id) {
+                        fileToId[s.filename] = s.document_id;
+                    }
+                });
+
+                // Simple markdown-ish parsing for display
+                let formattedAnswer = fullAnswer.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                formattedAnswer = formattedAnswer.replace(/\n/g, '<br>');
+                
+                // For each unique source, find the filename in the text and wrap it in a link
+                Object.keys(fileToId).forEach(filename => {
+                    const docId = fileToId[filename];
+                    const viewUrl = `${API_URL}/documents/${docId}/view?query_token=${token}`;
+                    
+                    // Escape filename for regex
+                    const escapedName = filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    
+                    // Match [filename] or just the filename if it's distinctive
+                    const regex = new RegExp(`\\[?${escapedName}\\]?`, 'g');
+                    formattedAnswer = formattedAnswer.replace(regex, `<a href="${viewUrl}" target="_blank" style="color: var(--secondary); font-weight: bold; text-decoration: underline;">[${filename}]</a>`);
+                });
+
+                aiMsgDiv.innerHTML = formattedAnswer;
+                container.scrollTop = container.scrollHeight;
+                
+                if (container.children.length <= 4) loadChats(); 
+            } catch (err) { 
+                console.error(err);
+                aiMsgDiv.innerHTML = `Error connecting to EduNavigator Brain: ${err.message || err}`; 
+            }
+        }
+
+        async function deleteChat(id) {
+            if (confirm('Delete this chat session permanently?')) {
+                await fetch(`${API_URL}/chat/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                if (currentChatId === id) {
+                    currentChatId = null;
+                    document.getElementById('chatMessages').innerHTML = '<div class="msg ai">Session deleted.</div>';
+                }
+                loadChats();
+            }
+        }
+
+        async function renameChat(id) {
+            const newTitle = prompt('Enter new chat title:');
+            if (newTitle) {
+                await fetch(`${API_URL}/chat/${id}/rename`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ title: newTitle })
+                });
+                loadChats();
+            }
+        }
+
+        async function uploadGlobal() {
+            const fileInput = document.getElementById('globalFile');
+            const subjectInput = document.getElementById('subject');
+            const file = fileInput.files[0];
+            const subject = subjectInput.value;
+            
+            if (!file || !subject) { alert('Please fill all fields'); return; }
+            
+            const btn = document.querySelector('#uploadView .btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Publishing...';
+            btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('subject', subject);
+            
+            try {
+                const res = await fetch(`${API_URL}/upload`, { 
+                    method: 'POST', 
+                    headers: { 'Authorization': `Bearer ${token}` }, 
+                    body: formData 
+                });
+                
+                if (res.ok) { 
+                    alert('Global document published successfully!'); 
+                    fileInput.value = '';
+                    subjectInput.value = '';
+                    showView('manage'); 
+                } else {
+                    const data = await res.json();
+                    alert('Upload failed: ' + (data.detail || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('Upload Error:', err);
+                alert('Connection error. Could not reach the server.');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function loadDocuments() {
+            const listContainer = document.getElementById('documentList');
+            listContainer.innerHTML = '<div style="text-align:center; padding:2rem; opacity:0.6;"><i class="fas fa-circle-notch fa-spin fa-2x"></i><br><br>Loading academic library...</div>';
+            
+            try {
+                const res = await fetch(`${API_URL}/documents`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.detail || 'Failed to load documents');
+                }
+                docsData = await res.json();
+                renderDocuments(docsData);
+            } catch (err) {
+                console.error('Load Library Error:', err);
+                listContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--accent); background:rgba(227, 30, 36, 0.05); border-radius:12px;">
+                    <i class="fas fa-exclamation-triangle fa-2x"></i><br><br>
+                    <strong>Error loading library:</strong><br>${err.message}
+                </div>`;
+            }
+        }
+
+        function renderDocuments(docsToRender) {
+            const listContainer = document.getElementById('documentList');
+            if (!docsToRender || docsToRender.length === 0) {
+                listContainer.innerHTML = '<div style="text-align:center; padding:3rem; background:white; border-radius:15px; border:2px dashed var(--border); color:#888;"><i class="fas fa-book-open fa-3x" style="margin-bottom:1rem; opacity:0.3;"></i><br>The academic library is empty. Upload resources to get started.</div>';
+                return;
+            }
+
+            listContainer.innerHTML = docsToRender.map(d => `
+                <div class="doc-card" id="doc-${d._id}">
+                    <div>
+                        <strong style="font-size:1.1rem; color:var(--primary);">${d.filename}</strong>
+                        <div style="font-size:0.85rem; color:#666; margin-top:4px;">
+                            <i class="fas fa-graduation-cap"></i> ${d.subject} • <i class="fas fa-calendar-alt"></i> ${new Date(d.upload_date).toLocaleDateString()}
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn" style="width:auto; background:var(--secondary); color:var(--primary); padding: 0.6rem 1.2rem;" onclick="downloadDoc('${d._id}', '${d.filename}')">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                        <button class="btn delete-btn" style="width:auto; background:rgba(227, 30, 36, 0.1); color:var(--accent); padding: 0.6rem 1.2rem; border: 1px solid var(--accent);" onclick="deleteDoc('${d._id}')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function downloadDoc(id, filename) {
+            // Open in new tab which triggers download via Content-Disposition
+            window.open(`${API_URL}/documents/${id}/view?query_token=${token}`, '_blank');
+        }
+
+        function filterLibrary() {
+            const query = document.getElementById('libSearchInput').value.toLowerCase();
+            const filtered = docsData.filter(d => 
+                d.filename.toLowerCase().includes(query) || 
+                d.subject.toLowerCase().includes(query)
+            );
+            renderDocuments(filtered);
+        }
+
+        async function deleteDoc(id) {
+            if (confirm('Are you sure you want to delete this global document? This cannot be undone.')) {
+                const docElement = document.getElementById(`doc-${id}`);
+                const deleteBtn = docElement.querySelector('.delete-btn');
+                const originalText = deleteBtn.innerHTML;
+                
+                deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                deleteBtn.disabled = true;
+
+                try {
+                    const res = await fetch(`${API_URL}/documents/${id}`, { 
+                        method: 'DELETE', 
+                        headers: { 'Authorization': `Bearer ${token}` } 
+                    });
+                    
+                    if (res.ok) {
+                        docElement.style.opacity = '0.5';
+                        docElement.style.transform = 'scale(0.95)';
+                        setTimeout(() => loadDocuments(), 300);
+                    } else {
+                        const data = await res.json();
+                        alert('Delete failed: ' + (data.detail || 'Unauthorized'));
+                        deleteBtn.innerHTML = originalText;
+                        deleteBtn.disabled = false;
+                    }
+                } catch (err) {
+                    console.error('Delete Error:', err);
+                    alert('Error connecting to server.');
+                    deleteBtn.innerHTML = originalText;
+                    deleteBtn.disabled = false;
+                }
+            }
+        }
+
+        function exportPDF() {
+            const element = document.getElementById('chatMessages');
+            html2pdf().from(element).save('EduNavigator_Chat_Export.pdf');
+        }
+
+        function exportDOCX() {
+            const element = document.getElementById('chatMessages');
+            const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export HTML To Doc<" + "/title><" + "/head><body" + ">";
+            const footer = "<" + "/body><" + "/html>";
+            const sourceHTML = header + element.innerHTML + footer;
+            const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+            const fileDownload = document.createElement("a");
+            document.body.appendChild(fileDownload);
+            fileDownload.href = source;
+            fileDownload.download = 'EduNavigator_Chat_Export.doc';
+            fileDownload.click();
+            document.body.removeChild(fileDownload);
+        }
+
+        function copyChatLink() {
+            const dummyLink = window.location.origin + "/share/chat/" + (currentChatId || "new");
+            navigator.clipboard.writeText(dummyLink).then(() => {
+                alert('Secure Chat Link copied to clipboard!');
+            });
+        }
+
+        function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+
+        // Add Enter key listener to chat input
+        document.getElementById('chatInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        loadChats();
+    </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pymongo
+python-multipart
+python-docx
+PyPDF2
+sentence-transformers
+faiss-cpu
+python-jose[cryptography]
+passlib[bcrypt]
+argon2-cffi
+reportlab
+python-dotenv
+dnspython
+groq
