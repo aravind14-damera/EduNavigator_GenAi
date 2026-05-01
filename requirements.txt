@@ -13,3 +13,4 @@ reportlab
 python-dotenv
 dnspython
 groq
+duckduckgo-search
