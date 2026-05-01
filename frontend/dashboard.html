@@ -45,9 +45,17 @@
         .export-btn { background: #f1f3f5; color: var(--text-main); border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; transition: 0.2s; }
         .export-btn:hover { background: var(--primary); color: white; }
         
-        .upload-status { font-size: 0.8rem; color: var(--secondary); margin-top: 5px; display: flex; align-items: center; gap: 8px; }
         .spinner { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Notes Modal Styles */
+        .modal { display: flex; align-items: center; justify-content: center; }
+        .note-section { margin-bottom: 2rem; }
+        .note-section h3 { border-left: 4px solid var(--secondary); padding-left: 10px; margin-bottom: 10px; color: var(--primary); }
+        .note-section p { line-height: 1.6; color: #444; }
+        .note-section ul { padding-left: 20px; }
+        .note-section li { margin-bottom: 8px; }
+        .note-citation { font-size: 0.8rem; color: var(--secondary); font-weight: bold; margin-left: 5px; cursor: pointer; text-decoration: underline; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -119,6 +127,33 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Notes Modal -->
+    <div id="notesModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
+        <div class="modal-content" style="background:white; padding:2rem; border-radius:15px; width:80%; max-width:800px; max-height:85vh; overflow-y:auto; position:relative; margin: auto;">
+            <span onclick="closeNotes()" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:1.5rem;"><i class="fas fa-times"></i></span>
+            <h2 id="modalDocTitle" style="color:var(--primary); margin-bottom:1.5rem;">Document Notes</h2>
+            <div id="notesContent">
+                <div style="text-align:center; padding:2rem;"><i class="fas fa-circle-notch fa-spin fa-2x"></i><br>Fetching notes...</div>
+            </div>
+            <div style="margin-top:2rem; display:flex; gap:10px; justify-content:flex-end;">
+                <button class="btn" onclick="copyNotes()" style="width:auto; background:#f1f3f5; color:var(--text-main);"><i class="fas fa-copy"></i> Copy</button>
+                <button class="btn" onclick="downloadNotes()" style="width:auto; background:var(--primary); color:white;"><i class="fas fa-download"></i> Download</button>
+            </div>
+    <!-- Quiz Modal -->
+    <div id="quizModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
+        <div class="modal-content" style="background:white; padding:2rem; border-radius:15px; width:80%; max-width:700px; max-height:85vh; overflow-y:auto; position:relative; margin: auto;">
+            <span onclick="closeQuiz()" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:1.5rem;"><i class="fas fa-times"></i></span>
+            <h2 id="quizTitle" style="color:var(--primary); margin-bottom:1.5rem;">Academic Practice Quiz</h2>
+            <div id="quizContent">
+                <div style="text-align:center; padding:2rem;"><i class="fas fa-circle-notch fa-spin fa-2x"></i><br>Preparing your practice session...</div>
+            </div>
+            <div id="quizFooter" style="margin-top:2rem; display:none; gap:10px; justify-content:flex-end;">
+                <button class="btn" id="submitQuizBtn" onclick="submitQuiz()" style="width:auto; background:var(--secondary); color:var(--primary);">Submit Answers</button>
+            </div>
+        </div>
+    </div>
     </div>
     <script>
         const API_URL = 'http://localhost:8000';
@@ -434,9 +469,17 @@
                             <i class="fas fa-graduation-cap"></i> ${d.subject} • <i class="fas fa-calendar-alt"></i> ${new Date(d.upload_date).toLocaleDateString()}
                         </div>
                     </div>
-                    <button class="btn" style="width:auto; background:var(--secondary); color:var(--primary); padding: 0.6rem 1.2rem;" onclick="downloadDoc('${d._id}', '${d.filename}')">
-                        <i class="fas fa-download"></i> Download
-                    </button>
+                    <div style="display:flex; gap:10px; flex-wrap: wrap;">
+                        <button class="btn" style="width:auto; background:#f1f3f5; color:var(--primary); padding: 0.6rem 1.2rem;" onclick="viewNotes('${d._id}', '${d.filename.replace(/'/g, "\\'")}')">
+                            <i class="fas fa-sticky-note"></i> Notes
+                        </button>
+                        <button class="btn" style="width:auto; background:var(--primary); color:white; padding: 0.6rem 1.2rem;" onclick="openQuiz('${d._id}', '${d.filename.replace(/'/g, "\\'")}')">
+                            <i class="fas fa-question-circle"></i> Quiz
+                        </button>
+                        <button class="btn" style="width:auto; background:var(--secondary); color:var(--primary); padding: 0.6rem 1.2rem;" onclick="downloadDoc('${d._id}', '${d.filename}')">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -479,6 +522,240 @@
                 alert('Secure Chat Link copied to clipboard!');
             });
         }
+
+        let currentNotes = null;
+
+        async function viewNotes(docId, filename) {
+            document.getElementById('modalDocTitle').textContent = `Notes: ${filename}`;
+            document.getElementById('notesModal').style.display = 'flex';
+            const container = document.getElementById('notesContent');
+            container.innerHTML = '<div style="text-align:center; padding:2rem;"><i class="fas fa-circle-notch fa-spin fa-2x"></i><br><br>Fetching notes...</div>';
+            
+            try {
+                const res = await fetch(`${API_URL}/documents/${docId}/notes`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.status === 404) {
+                    container.innerHTML = `
+                        <div style="text-align:center; padding:2rem;">
+                            <p>No notes generated for this document yet.</p>
+                            <button class="btn" onclick="generateNotes('${docId}', '${filename.replace(/'/g, "\\'")}')" style="width:auto; margin-top:1rem;">
+                                <i class="fas fa-magic"></i> Generate AI Notes
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                const data = await res.json();
+                currentNotes = data.notes;
+                renderNotes(data.notes);
+            } catch (err) {
+                container.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+            }
+        }
+
+        async function generateNotes(docId, filename) {
+            const container = document.getElementById('notesContent');
+            container.innerHTML = '<div style="text-align:center; padding:2rem;"><i class="fas fa-circle-notch fa-spin fa-2x"></i><br><br>AI is analyzing the document and researching the web...<br><small>This may take up to a minute.</small></div>';
+            
+            try {
+                await fetch(`${API_URL}/documents/${docId}/notes/generate`, { 
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                // Poll for completion
+                let attempts = 0;
+                const interval = setInterval(async () => {
+                    attempts++;
+                    const res = await fetch(`${API_URL}/documents/${docId}/notes`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.ok) {
+                        clearInterval(interval);
+                        const data = await res.json();
+                        currentNotes = data.notes;
+                        renderNotes(data.notes);
+                    }
+                    if (attempts > 30) {
+                        clearInterval(interval);
+                        container.innerHTML = '<p>Note generation is taking longer than expected. Please check back in a moment.</p>';
+                    }
+                }, 3000);
+            } catch (err) {
+                container.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+            }
+        }
+
+        function renderNotes(notes) {
+            const container = document.getElementById('notesContent');
+            
+            // Format citations in text
+            const formatText = (text) => {
+                if (!text) return "";
+                return text.replace(/\[(https?:\/\/.*?)\]/g, '<a href="$1" target="_blank" class="note-citation">Source</a>')
+                           .replace(/\[Document\]/g, '<span class="note-citation" title="From the uploaded document">[Doc]</span>');
+            };
+
+            container.innerHTML = `
+                <div class="note-section">
+                    <h3>Summary</h3>
+                    <p>${formatText(notes.summary)}</p>
+                </div>
+                <div class="note-section">
+                    <h3>Key Points</h3>
+                    <ul>
+                        ${notes.key_points.map(p => `<li>${formatText(p)}</li>`).join('')}
+                    </ul>
+                </div>
+                <div class="note-section">
+                    <h3>Important Concepts</h3>
+                    <ul>
+                        ${notes.important_concepts.map(c => `<li>${formatText(c)}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        function closeNotes() { document.getElementById('notesModal').style.display = 'none'; }
+
+        function copyNotes() {
+            if (!currentNotes) return;
+            const text = `SUMMARY:\n${currentNotes.summary}\n\nKEY POINTS:\n${currentNotes.key_points.join('\n')}\n\nCONCEPTS:\n${currentNotes.important_concepts.join('\n')}`;
+            navigator.clipboard.writeText(text).then(() => alert('Notes copied to clipboard!'));
+        }
+
+        function downloadNotes() {
+            if (!currentNotes) return;
+            const text = `SUMMARY:\n${currentNotes.summary}\n\nKEY POINTS:\n${currentNotes.key_points.join('\n')}\n\nCONCEPTS:\n${currentNotes.important_concepts.join('\n')}`;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Document_Notes.txt';
+            a.click();
+        }
+
+        let currentQuizDocId = null;
+        let currentQuizQuestions = [];
+
+        async function openQuiz(docId, filename) {
+            currentQuizDocId = docId;
+            document.getElementById('quizTitle').textContent = `Quiz: ${filename}`;
+            document.getElementById('quizModal').style.display = 'flex';
+            document.getElementById('quizFooter').style.display = 'none';
+            const container = document.getElementById('quizContent');
+            container.innerHTML = '<div style="text-align:center; padding:2rem;"><i class="fas fa-circle-notch fa-spin fa-2x"></i><br><br>Analyzing document to generate practice questions...</div>';
+            
+            try {
+                const res = await fetch(`${API_URL}/documents/${docId}/quiz`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.detail || 'Failed to load quiz');
+                
+                if (!data.questions || !Array.isArray(data.questions)) {
+                    throw new Error('AI generated an invalid quiz format. Please try again.');
+                }
+
+                currentQuizQuestions = data.questions;
+                renderQuizQuestions(data.questions);
+            } catch (err) {
+                container.innerHTML = `<div style="text-align:center; padding:2rem; color:red;">
+                    <i class="fas fa-exclamation-circle fa-2x"></i><br><br>
+                    <strong>Quiz Error:</strong><br>${err.message}
+                </div>`;
+            }
+        }
+
+        function renderQuizQuestions(questions) {
+            if (!questions || !questions.map) {
+                console.error("Invalid questions object:", questions);
+                return;
+            }
+            const container = document.getElementById('quizContent');
+            document.getElementById('quizFooter').style.display = 'flex';
+            
+            container.innerHTML = questions.map((q, qIdx) => `
+                <div class="quiz-question" style="margin-bottom:2rem; padding:1.5rem; background:#f8f9fa; border-radius:10px;">
+                    <p style="font-weight:bold; margin-bottom:1rem;">${qIdx + 1}. ${q.question}</p>
+                    <div class="quiz-options">
+                        ${q.options.map((opt, oIdx) => `
+                            <label style="display:block; margin-bottom:8px; cursor:pointer;">
+                                <input type="radio" name="question_${qIdx}" value="${oIdx}" style="margin-right:10px;">
+                                ${opt}
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function submitQuiz() {
+            const userAnswers = [];
+            for (let i = 0; i < currentQuizQuestions.length; i++) {
+                const selected = document.querySelector(`input[name="question_${i}"]:checked`);
+                userAnswers.push(selected ? parseInt(selected.value) : null);
+            }
+
+            if (userAnswers.includes(null)) {
+                if (!confirm("You haven't answered all questions. Submit anyway?")) return;
+            }
+
+            const container = document.getElementById('quizContent');
+            container.innerHTML = '<div style="text-align:center; padding:2rem;"><i class="fas fa-circle-notch fa-spin fa-2x"></i><br><br>Evaluating your answers...</div>';
+            document.getElementById('quizFooter').style.display = 'none';
+
+            try {
+                const res = await fetch(`${API_URL}/documents/${currentQuizDocId}/quiz/evaluate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ user_answers: userAnswers })
+                });
+                
+                const results = await res.json();
+                
+                if (!res.ok) {
+                    const errorMsg = results.detail ? (typeof results.detail === 'string' ? results.detail : JSON.stringify(results.detail)) : 'Evaluation failed';
+                    throw new Error(errorMsg);
+                }
+                
+                renderQuizResults(results);
+            } catch (err) {
+                container.innerHTML = `<div style="text-align:center; padding:2rem; color:red;">
+                    <i class="fas fa-exclamation-circle fa-2x"></i><br><br>
+                    <strong>Evaluation Error:</strong><br>${err.message || JSON.stringify(err)}
+                    <br><button class="btn" onclick="openQuiz('${currentQuizDocId}', 'Retrying...')" style="width:auto; margin-top:1rem;">Retry Quiz</button>
+                </div>`;
+            }
+        }
+
+        function renderQuizResults(results) {
+            if (!results || !results.results) {
+                console.error("Invalid results object:", results);
+                return;
+            }
+            const container = document.getElementById('quizContent');
+            container.innerHTML = `
+                <div style="text-align:center; margin-bottom:2rem; padding:2rem; background:var(--primary); color:white; border-radius:15px;">
+                    <h1 style="font-size:3rem; margin:0;">${results.score}/${results.total}</h1>
+                    <p style="margin:5px 0 0;">${results.percentage.toFixed(1)}% Score</p>
+                </div>
+                <div>
+                    ${results.results.map((r, i) => `
+                        <div style="margin-bottom:1.5rem; padding:1.2rem; border:1px solid ${r.is_correct ? '#d4edda' : '#f8d7da'}; border-radius:10px; background:${r.is_correct ? '#fafffa' : '#fffafb'};">
+                            <p style="font-weight:bold; color:var(--primary);">${i+1}. ${r.question}</p>
+                            <p style="margin:8px 0; color:${r.is_correct ? 'green' : 'red'};">
+                                <i class="fas ${r.is_correct ? 'fa-check-circle' : 'fa-times-circle'}"></i> 
+                                ${r.is_correct ? 'Correct!' : `Your answer: ${currentQuizQuestions[i].options[r.user_choice] || 'None'}`}
+                            </p>
+                            ${!r.is_correct ? `<p style="margin:5px 0; color:green;">Correct Answer: ${currentQuizQuestions[i].options[r.correct_index]}</p>` : ''}
+                            <div style="margin-top:10px; font-size:0.9rem; padding:10px; background:rgba(0,0,0,0.03); border-radius:5px; color:#555;">
+                                <strong>Explanation:</strong> ${r.explanation}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <button class="btn" onclick="closeQuiz()" style="width:100%; margin-top:1rem;">Close Results</button>
+            `;
+        }
+
+        function closeQuiz() { document.getElementById('quizModal').style.display = 'none'; }
 
         function logout() { localStorage.clear(); window.location.href = 'login.html'; }
         

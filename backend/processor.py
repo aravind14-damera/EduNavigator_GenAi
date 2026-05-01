@@ -1,9 +1,11 @@
 import os
 from dotenv import load_dotenv
 import PyPDF2
+import re
+from duckduckgo_search import DDGS
 from docx import Document
 from sentence_transformers import SentenceTransformer
-from backend.database import chunks_collection, documents_collection
+from backend.database import chunks_collection, documents_collection, notes_collection, quizzes_collection
 from bson import ObjectId
 from datetime import datetime
 from groq import Groq
@@ -69,7 +71,7 @@ def process_document(file_path, filename, subject, owner_email, chat_id=None):
         if chunks:
             chunks_collection.insert_many(chunks)
         
-        return doc_id
+        return doc_id, text
     except Exception as e:
         print(f"Processing Error: {e}")
         return None
@@ -153,3 +155,178 @@ def generate_ai_response(question, context, history=None):
     except Exception as e:
         print(f"AI Generation Error: {e}")
         return f"I'm sorry, I encountered an error while thinking: {str(e)}"
+
+# --- NOTES GENERATION (MAP-REDUCE-FORMAT) ---
+
+def clean_text(text):
+    """Basic text cleaning: removing multiple spaces, headers/footers placeholders, etc."""
+    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'Page \d+ of \d+', '', text)
+    return text.strip()
+
+def map_summarize_chunks(text, chunk_size=4000):
+    """Phase A: Chunk-level understanding - Summarize each chunk independently."""
+    summaries = []
+    for i in range(0, len(text), chunk_size):
+        chunk = text[i : i + chunk_size]
+        prompt = f"Summarize the following technical/academic content concisely, focusing on key facts and concepts:\n\n{chunk}"
+        try:
+            response = groq_client.chat.completions.create(
+                model="llama-3.1-8b-instant", # Faster model for map phase
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=500
+            )
+            summaries.append(response.choices[0].message.content)
+        except Exception as e:
+            print(f"Chunk Summary Error: {e}")
+    return summaries
+
+def web_search_enrichment(topics):
+    """Phase D: Web Search - Get external context for key topics."""
+    web_results = []
+    with DDGS() as ddgs:
+        for topic in topics[:3]: # Limit to top 3 topics
+            try:
+                results = list(ddgs.text(topic, max_results=2))
+                for r in results:
+                    web_results.append({
+                        "title": r['title'],
+                        "href": r['href'],
+                        "body": r['body']
+                    })
+            except Exception as e:
+                print(f"Web Search Error for {topic}: {e}")
+    return web_results
+
+def generate_notes(doc_id, text, user_email):
+    """Main orchestration for Map-Reduce-Format Notes Generation."""
+    print(f"Starting notes generation for doc: {doc_id}")
+    
+    # 1. Clean Text
+    text = clean_text(text)
+    
+    # 2. Map Phase
+    chunk_summaries = map_summarize_chunks(text)
+    combined_summaries = "\n\n".join(chunk_summaries)
+    
+    # 3. Identify Search Topics (Internal step)
+    try:
+        topic_prompt = f"Based on these document summaries, list the 3 most important academic topics or terms that would benefit from additional external context/verification. Return ONLY a comma-separated list.\n\nSummaries: {combined_summaries[:2000]}"
+        topic_res = groq_client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": topic_prompt}]
+        )
+        topics = [t.strip() for t in topic_res.choices[0].message.content.split(",")]
+    except:
+        topics = []
+
+    # 4. Web Search Phase
+    web_context = web_search_enrichment(topics)
+    web_text = "\n".join([f"Source: {w['href']}\nContent: {w['body']}" for w in web_context])
+
+    # 5. Reduce & Format Phase
+    final_prompt = f"""
+    Using the provided Document Summaries and Web Search results, create a comprehensive set of structured notes.
+    
+    DOCUMENT SUMMARIES:
+    {combined_summaries}
+    
+    WEB SEARCH CONTEXT:
+    {web_text}
+    
+    STRUCTURE:
+    1. SUMMARY: A high-level overview of the entire document.
+    2. KEY POINTS: A bulleted list of the most important takeaways from the document.
+    3. IMPORTANT CONCEPTS: Definitions or explanations of core concepts, enriched with web data where helpful.
+    
+    CITATION RULES:
+    - Cite the document as [Document] for points originating from it.
+    - Cite web sources using their URL, e.g., [https://example.com].
+    - ALWAYS cite at least one source for every major point.
+    
+    Format the output as clean JSON with keys: "summary", "key_points", "important_concepts".
+    Each key should contain a string or list of strings as appropriate.
+    """
+    
+    try:
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "system", "content": "You are a professional academic note-taker. Output ONLY valid JSON."},
+                      {"role": "user", "content": final_prompt}],
+            response_format={"type": "json_object"}
+        )
+        notes_data = response.choices[0].message.content
+        import json
+        structured_notes = json.loads(notes_data)
+        
+        # Save to DB
+        note_entry = {
+            "document_id": ObjectId(doc_id),
+            "user_email": user_email,
+            "notes": structured_notes,
+            "timestamp": datetime.utcnow()
+        }
+        notes_collection.update_one(
+            {"document_id": ObjectId(doc_id)},
+            {"$set": note_entry},
+            upsert=True
+        )
+        print(f"Notes generated and saved for doc: {doc_id}")
+        return structured_notes
+    except Exception as e:
+        print(f"Final Notes Generation Error: {e}")
+        return None
+
+# --- QUIZ GENERATION ---
+
+def generate_quiz(doc_id, text, user_email):
+    """Generates a structured practice quiz from document text."""
+    print(f"Starting quiz generation for doc: {doc_id}")
+    
+    # Pick first few thousand characters to stay within token limits
+    # In a more advanced version, we could pick diverse chunks.
+    context = text[:8000]
+    
+    prompt = f"""
+    Based on the following academic content, generate a practice quiz with 5 multiple-choice questions.
+    
+    CONTENT:
+    {context}
+    
+    RULES:
+    1. Each question must have exactly 4 options (A, B, C, D).
+    2. Provide the index of the correct answer (0, 1, 2, or 3).
+    3. Provide a brief explanation for why the answer is correct.
+    4. Ensure the questions cover core concepts and facts from the text.
+    
+    Format the output as clean JSON with a key "questions" containing a list of objects.
+    Each object should have keys: "question", "options" (list of 4 strings), "correct_index" (int), "explanation" (string).
+    """
+    
+    try:
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "system", "content": "You are a professional academic tutor. Output ONLY valid JSON."},
+                      {"role": "user", "content": prompt}],
+            response_format={"type": "json_object"}
+        )
+        import json
+        quiz_data = json.loads(response.choices[0].message.content)
+        
+        # Save to DB
+        quiz_entry = {
+            "document_id": ObjectId(doc_id),
+            "user_email": user_email,
+            "quiz": quiz_data,
+            "timestamp": datetime.utcnow()
+        }
+        quizzes_collection.update_one(
+            {"document_id": ObjectId(doc_id)},
+            {"$set": quiz_entry},
+            upsert=True
+        )
+        print(f"Quiz generated and saved for doc: {doc_id}")
+        return quiz_data
+    except Exception as e:
+        print(f"Quiz Generation Error: {e}")
+        return None

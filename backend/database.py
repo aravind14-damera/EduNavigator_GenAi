@@ -16,6 +16,8 @@ documents_collection = db['documents']
 chunks_collection = db['chunks']
 query_logs_collection = db['query_logs']
 chats_collection = db['chats'] # NEW: Conversation storage
+notes_collection = db['notes'] # NEW: Generated notes storage
+quizzes_collection = db['quizzes'] # NEW: Generated quizzes storage
 
 # Ensure Indexes (Optional but good for performance)
 try:
